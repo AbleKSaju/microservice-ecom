@@ -23,6 +23,11 @@ router.post('/requestForForgetPassoword',requestForchangePassword)
 router.post('/veriyOtpForgetPassword',verifyotpChagePAssword)
 router.post('/newPassword',newPassword)
 router.post('/login',loginUser)
+router.post('/createAdress',authMiddleware,createAddress)
+router.post('/editAdress',authMiddleware,editAddress)
+router.post('/editProfile',authMiddleware,editProdfile)
+router.get('/logout',logoutUser)
+router.post('/create-order',authMiddleware,createOrder)
 
 
 

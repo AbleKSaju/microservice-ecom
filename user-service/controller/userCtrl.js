@@ -197,3 +197,207 @@ export const editProdfile = async (req, res) => {
 };
 
 //adress create
+export const createAddress = async (req, res) => {
+  try {
+    const {
+      fullName,
+      mobile,
+      region,
+      pinCode,
+      areaStreet,
+      ladmark,
+      townCity,
+      state,
+      adressType,
+    } = req.body;
+
+    const userCr = req.user;
+    const user = await User.findById(userCr.id);
+    if (!user) {
+      res.status(400).json("Imvalid credencial");
+    } else {
+      const newAddres = {
+        fullName,
+        mobile,
+        region,
+        pinCode,
+        areaStreet,
+        ladmark,
+        townCity,
+        state,
+        adressType,
+      };
+
+      user.address.push(newAddres);
+      await user.save();
+
+      res.status(200).json(user.address);
+    }
+  } catch (error) {
+    res.status(400).json("Error in User-service  createAddress  " + error);
+  }
+};
+
+//edit adress
+export const editAddress = async (req, res) => {
+  try {
+    console.log("enter");
+    const {
+      fullName,
+      mobile,
+      region,
+      pinCode,
+      areaStreet,
+      ladmark,
+      townCity,
+      state,
+      adressType,
+      id,
+    } = req.body;
+    const userCr = req.user;
+
+    const user = await User.findById(userCr.id);
+    console.log(user);
+
+    const addressIndex = user.address.findIndex((item) => item._id == id);
+    console.log(addressIndex,"ind");
+
+    if (addressIndex === -1) {
+      return res.status(404).json({ message: "Address not found" });
+    }
+    user.address[addressIndex].fullName = fullName;
+    user.address[addressIndex].mobile = mobile;
+    user.address[addressIndex].region = region;
+    user.address[addressIndex].pinCode = pinCode;
+    user.address[addressIndex].areaStreet = areaStreet;
+    user.address[addressIndex].ladmark = ladmark;
+    user.address[addressIndex].townCity = townCity;
+    user.address[addressIndex].state = state;
+    user.address[addressIndex].adressType = adressType;
+
+    await user.save();
+
+    res.status(200).json(user.address[addressIndex]);
+  } catch (error) {
+    res.status(400).json("Error in User-service  editAddress  " + error);
+  }
+};
+
+//forget password
+export const requestForchangePassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      port: 587,
+      secure: false,
+      requireTLS: true,
+      auth: {
+        user: process.env.AUTH_EMAIL,
+        pass: process.env.AUTH_PASS,
+      },
+    });
+
+    const otp = generateotp();
+
+    const info = await transporter.sendMail({
+      from: process.env.AUTH_EMAIL,
+      to: email,
+      subject: "Forget password otp  ✔",
+      text: `Your OTP is : ${otp}`,
+      html: `<b>
+            <h2 style="color: #3498db;">Password Reset OTP</h2>
+            <p style="font-size: 16px;">You've requested to reset your password. Use the following OTP:</p>
+            <p style="font-size: 24px; font-weight: bold; color: #2ecc71;">Your OTP is: ${otp}</p>
+            <p style="font-size: 14px; margin-top: 20px;">Click the button below to reset your password:</p>
+            <a href="#" style="display: inline-block; padding: 10px 20px; background-color: #2ecc71; color: #fff; text-decoration: none; border-radius: 5px; margin-top: 10px;">Reset Password</a>
+            </b>
+                `,
+    });
+
+    if (info) {
+      req.session.forgetOtp = otp;
+      req.session.forgetEmail = email;
+
+      res.status(200).json("Check your mail and verify ...");
+    }
+  } catch (error) {
+    res
+      .status(400)
+      .json("Error in User-service  requestForchangePassword  " + error);
+  }
+};
+
+//verify otp and chage the password
+export const verifyotpChagePAssword = async (req, res) => {
+  try {
+    const { otp } = req.body;
+    const sesionOtp = req.session.forgetOtp;
+    if (otp == sesionOtp) {
+      res.status(200).json("Enter passoword");
+    } else {
+      res.status(400).json("Otp is not Valid");
+    }
+  } catch (error) {
+    res
+      .status(400)
+      .json("Error in User-service  verifyotpChagePAssword  " + error);
+  }
+};
+
+//enter new Password
+export const newPassword = async (req, res) => {
+  try {
+    const { password } = req.body;
+    const email = req.session.forgetEmail;
+    const user = await User.findOne({ email });
+    const hashPasswor = await hashPassword(password);
+    user.password = hashPasswor;
+    await user.save();
+    res.status(200).json(user);
+  } catch (error) {
+    res.status(400).json("Error in User-service  newPassword  " + error);
+  }
+};
+
+//logout
+
+export const logoutUser = (req, res) => {
+  res.cookie("jwt", "", {
+    httpOnly: true,
+    expires: new Date(0),
+  });
+
+  res.status(200).json("User is loged OUT");
+};
+
+//create an order
+export const createOrder = async (req, res) => {
+  try {
+    const { addressId } = req.body;
+    const userId = req.user.id;
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(400).json("Un Autherised User");
+    }
+
+    const address = user.address.find((item) => item._id == addressId);
+
+    if (!address) {
+      return res.status(400).json("Enter a valid Address Id");
+    }
+    const obj = {
+      event: "create-order",
+      address: address,
+      userId: userId,
+    };
+
+    await serviceToProducer(obj, "user-topic");
+
+    res
+      .status(200)
+      .json("Order Created success full take your orders to see the order..!");
+  } catch (error) {
+    res.status(400).json("Error in User-service  createOrder  " + error);
+  }
+};
